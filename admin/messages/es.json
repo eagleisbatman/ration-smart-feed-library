@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "title": "Administrador de Formulación de Alimentos",
+    "description": "Panel de administración para gestión de alimentos y acceso API"
+  },
+  "common": {
+    "welcome": "Bienvenido",
+    "dashboard": "Panel",
+    "feeds": "Alimentos",
+    "countries": "Países",
+    "organizations": "Organizaciones",
+    "apiKeys": "Claves API",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión",
+    "login": "Iniciar sesión",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "actions": "Acciones",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "confirm": "Confirmar",
+    "close": "Cerrar"
+  },
+  "feeds": {
+    "title": "Gestión de Alimentos",
+    "addFeed": "Agregar Alimento",
+    "editFeed": "Editar Alimento",
+    "deleteFeed": "Eliminar Alimento",
+    "bulkImport": "Importación Masiva",
+    "export": "Exportar",
+    "name": "Nombre del Alimento",
+    "type": "Tipo",
+    "category": "Categoría",
+    "country": "País",
+    "nutritionalValues": "Valores Nutricionales",
+    "dm": "Materia Seca (%)",
+    "cp": "Proteína Bruta (%)",
+    "ndf": "NDF (%)",
+    "adf": "ADF (%)",
+    "price": "Precio por kg"
+  },
+  "apiKeys": {
+    "title": "Gestión de Claves API",
+    "generateKey": "Generar Clave API",
+    "revokeKey": "Revocar Clave",
+    "keyPrefix": "Prefijo de Clave",
+    "organization": "Organización",
+    "lastUsed": "Último Uso",
+    "expiresAt": "Expira En",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "copyKey": "Copiar Clave",
+    "keyCopied": "Clave copiada al portapapeles",
+    "keyWarning": "Guarde esta clave de forma segura. No se mostrará nuevamente."
+  },
+  "organizations": {
+    "title": "Organizaciones",
+    "createOrg": "Crear Organización",
+    "editOrg": "Editar Organización",
+    "name": "Nombre de la Organización",
+    "slug": "Slug",
+    "contactEmail": "Email de Contacto",
+    "rateLimit": "Límite de Velocidad (por hora)",
+    "active": "Activo",
+    "inactive": "Inactivo"
+  },
+  "countries": {
+    "title": "Países",
+    "countryName": "Nombre del País",
+    "countryCode": "Código del País",
+    "currency": "Moneda",
+    "feedCount": "Cantidad de Alimentos",
+    "admins": "Administradores",
+    "activate": "Activar",
+    "deactivate": "Desactivar"
+  }
+}
+

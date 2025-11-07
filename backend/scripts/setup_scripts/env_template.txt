@@ -1,0 +1,54 @@
+# Feed Formulation Backend - Environment Configuration Template
+# Copy this file to .env and update with your actual values
+
+# GitHub Configuration (Required)
+GITHUB_USERNAME=your-username
+GITHUB_TOKEN=your-personal-access-token
+GITHUB_REPO=https://github.com/your-username/feed-formulation-be.git
+
+# SSL Configuration (Optional)
+DOMAIN_NAME=yourdomain.com
+EMAIL=your-email@example.com
+
+# Database Configuration (Auto-configured by setup scripts)
+DATABASE_URL=postgresql://feed_user:feed_user_password@localhost:5432/feed_formulation
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=feed_formulation
+DB_USER=feed_user
+DB_PASSWORD=feed_user_password
+
+# Application Configuration
+APP_NAME=Feed Formulation Backend
+APP_VERSION=v3.0
+APP_ENV=production
+APP_DEBUG=false
+APP_HOST=0.0.0.0
+APP_PORT=8000
+
+# Security Configuration
+SECRET_KEY=your-secret-key-here
+JWT_SECRET_KEY=your-jwt-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Email Configuration (Optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+
+# AWS Configuration (Optional - for S3 storage)
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=your-s3-bucket
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE_PATH=/var/log/feed-formulation
+
+# CORS Configuration
+CORS_ORIGINS=["http://localhost:3000", "https://yourdomain.com"]
+ALLOWED_HOSTS=["localhost", "127.0.0.1", "yourdomain.com"]

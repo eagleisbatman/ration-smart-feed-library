@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "title": "Administration de Formulation d'Aliments",
+    "description": "Tableau de bord d'administration pour la gestion des aliments et l'accès API"
+  },
+  "common": {
+    "welcome": "Bienvenue",
+    "dashboard": "Tableau de bord",
+    "feeds": "Aliments",
+    "countries": "Pays",
+    "organizations": "Organisations",
+    "apiKeys": "Clés API",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "login": "Connexion",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "actions": "Actions",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "confirm": "Confirmer",
+    "close": "Fermer"
+  },
+  "feeds": {
+    "title": "Gestion des Aliments",
+    "addFeed": "Ajouter un Aliment",
+    "editFeed": "Modifier un Aliment",
+    "deleteFeed": "Supprimer un Aliment",
+    "bulkImport": "Importation en Masse",
+    "export": "Exporter",
+    "name": "Nom de l'Aliment",
+    "type": "Type",
+    "category": "Catégorie",
+    "country": "Pays",
+    "nutritionalValues": "Valeurs Nutritionnelles",
+    "dm": "Matière Sèche (%)",
+    "cp": "Protéine Brute (%)",
+    "ndf": "NDF (%)",
+    "adf": "ADF (%)",
+    "price": "Prix par kg"
+  },
+  "apiKeys": {
+    "title": "Gestion des Clés API",
+    "generateKey": "Générer une Clé API",
+    "revokeKey": "Révoquer la Clé",
+    "keyPrefix": "Préfixe de Clé",
+    "organization": "Organisation",
+    "lastUsed": "Dernière Utilisation",
+    "expiresAt": "Expire Le",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "copyKey": "Copier la Clé",
+    "keyCopied": "Clé copiée dans le presse-papiers",
+    "keyWarning": "Stockez cette clé en toute sécurité. Elle ne sera plus affichée."
+  },
+  "organizations": {
+    "title": "Organisations",
+    "createOrg": "Créer une Organisation",
+    "editOrg": "Modifier une Organisation",
+    "name": "Nom de l'Organisation",
+    "slug": "Slug",
+    "contactEmail": "Email de Contact",
+    "rateLimit": "Limite de Débit (par heure)",
+    "active": "Actif",
+    "inactive": "Inactif"
+  },
+  "countries": {
+    "title": "Pays",
+    "countryName": "Nom du Pays",
+    "countryCode": "Code du Pays",
+    "currency": "Devise",
+    "feedCount": "Nombre d'Aliments",
+    "admins": "Administrateurs",
+    "activate": "Activer",
+    "deactivate": "Désactiver"
+  }
+}
+

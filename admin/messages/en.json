@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "title": "Feed Formulation Admin",
+    "description": "Admin dashboard for feed management and API access"
+  },
+  "common": {
+    "welcome": "Welcome",
+    "dashboard": "Dashboard",
+    "feeds": "Feeds",
+    "countries": "Countries",
+    "organizations": "Organizations",
+    "apiKeys": "API Keys",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "actions": "Actions",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "close": "Close"
+  },
+  "feeds": {
+    "title": "Feed Management",
+    "addFeed": "Add Feed",
+    "editFeed": "Edit Feed",
+    "deleteFeed": "Delete Feed",
+    "bulkImport": "Bulk Import",
+    "export": "Export",
+    "name": "Feed Name",
+    "type": "Type",
+    "category": "Category",
+    "country": "Country",
+    "nutritionalValues": "Nutritional Values",
+    "dm": "Dry Matter (%)",
+    "cp": "Crude Protein (%)",
+    "ndf": "NDF (%)",
+    "adf": "ADF (%)",
+    "price": "Price per kg"
+  },
+  "apiKeys": {
+    "title": "API Key Management",
+    "generateKey": "Generate API Key",
+    "revokeKey": "Revoke Key",
+    "keyPrefix": "Key Prefix",
+    "organization": "Organization",
+    "lastUsed": "Last Used",
+    "expiresAt": "Expires At",
+    "active": "Active",
+    "inactive": "Inactive",
+    "copyKey": "Copy Key",
+    "keyCopied": "Key copied to clipboard",
+    "keyWarning": "Store this key securely. It will not be shown again."
+  },
+  "organizations": {
+    "title": "Organizations",
+    "createOrg": "Create Organization",
+    "editOrg": "Edit Organization",
+    "name": "Organization Name",
+    "slug": "Slug",
+    "contactEmail": "Contact Email",
+    "rateLimit": "Rate Limit (per hour)",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "countries": {
+    "title": "Countries",
+    "countryName": "Country Name",
+    "countryCode": "Country Code",
+    "currency": "Currency",
+    "feedCount": "Feed Count",
+    "admins": "Admins",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  }
+}
+
