@@ -31,7 +31,7 @@ SELECT DISTINCT
 FROM feeds f
 INNER JOIN feed_types ft ON ft.type_name = f.fd_type
 WHERE f.fd_category IS NOT NULL
-ON CONFLICT (category_name) DO NOTHING;
+ON CONFLICT (category_name, feed_type_id) DO NOTHING;
 
 -- Step 3: Update feeds table to link fd_category_id
 UPDATE feeds f
