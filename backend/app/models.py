@@ -17,7 +17,7 @@ Base = declarative_base()
 
 # New Country Model for Authentication System
 class CountryModel(Base):
-    __tablename__ = 'country'
+    __tablename__ = 'countries'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
     name = Column(String(100), nullable=False, unique=True)
@@ -30,31 +30,35 @@ class CountryModel(Base):
     # Relationships
     users = relationship("UserInformationModel", back_populates="country_rel")
     feeds = relationship("Feed", back_populates="country_rel")
+    languages = relationship("CountryLanguage", back_populates="country", cascade="all, delete-orphan")
 
 class UserInformationModel(Base):
-    __tablename__ = 'user_information'
+    __tablename__ = 'users'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     
     # Authentication fields
     email_id = Column(String(255), nullable=False, unique=True)
-    pin_hash = Column(String(255), nullable=False)
-    country_id = Column(UUID(as_uuid=True), ForeignKey('country.id'), nullable=False)
+    pin_hash = Column(String(255), nullable=True)  # Made nullable for OTP-only users
+    country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationship to country
     country_rel = relationship("CountryModel", back_populates="users")
     
-    # Admin flag for feedback management
+    # Admin flags
     is_admin = Column(Boolean, default=False, nullable=False)
+    is_superadmin = Column(Boolean, default=False, nullable=False)  # Superadmin can create country admins
+    country_admin_country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id'), nullable=True)  # Country-level admin
     
     # User status flag for admin management
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Multi-tenant support: Optional organization association
     organization_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), nullable=True)
+    organization_admin_org_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), nullable=True)  # Organization admin
     
     # Relationship to user feedback
     feedbacks = relationship("UserFeedback", back_populates="user")
@@ -81,8 +85,8 @@ class Country(BaseModel):
 class UserRegistration(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="User's full name")
     email_id: str = Field(..., max_length=255, description="User's email address")
-    pin: str = Field(..., min_length=4, max_length=4, description="4-digit PIN")
     country_id: str = Field(..., description="Country UUID")
+    otp_code: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code sent to email")
 
     @validator('email_id')
     def validate_email_format(cls, v):
@@ -92,13 +96,13 @@ class UserRegistration(BaseModel):
             raise ValueError('Invalid email format')
         return v.lower().strip()
 
-    @validator('pin')
-    def validate_pin(cls, v):
-        """Validate PIN is exactly 4 digits"""
+    @validator('otp_code')
+    def validate_otp(cls, v):
+        """Validate OTP is exactly 6 digits"""
         if not v.isdigit():
-            raise ValueError('PIN must contain only digits')
-        if len(v) != 4:
-            raise ValueError('PIN must be exactly 4 digits')
+            raise ValueError('OTP must contain only digits')
+        if len(v) != 6:
+            raise ValueError('OTP must be exactly 6 digits')
         return v
 
     @validator('name')
@@ -111,7 +115,7 @@ class UserRegistration(BaseModel):
 
 class UserLogin(BaseModel):
     email_id: str = Field(..., max_length=255, description="User's email address")
-    pin: str = Field(..., min_length=4, max_length=4, description="4-digit PIN")
+    otp_code: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code sent to email")
 
     @validator('email_id')
     def validate_email_format(cls, v):
@@ -121,9 +125,50 @@ class UserLogin(BaseModel):
             raise ValueError('Invalid email format')
         return v.lower().strip()
 
+    @validator('otp_code')
+    def validate_otp(cls, v):
+        """Validate OTP is exactly 6 digits"""
+        if not v.isdigit():
+            raise ValueError('OTP must contain only digits')
+        if len(v) != 6:
+            raise ValueError('OTP must be exactly 6 digits')
+        return v
+
+# Legacy PIN-based models (for backward compatibility during migration)
+class UserRegistrationLegacy(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="User's full name")
+    email_id: str = Field(..., max_length=255, description="User's email address")
+    pin: str = Field(..., min_length=4, max_length=4, description="4-digit PIN (legacy)")
+    country_id: str = Field(..., description="Country UUID")
+
+    @validator('email_id')
+    def validate_email_format(cls, v):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, v):
+            raise ValueError('Invalid email format')
+        return v.lower().strip()
+
     @validator('pin')
     def validate_pin(cls, v):
-        """Validate PIN is exactly 4 digits"""
+        if not v.isdigit():
+            raise ValueError('PIN must contain only digits')
+        if len(v) != 4:
+            raise ValueError('PIN must be exactly 4 digits')
+        return v
+
+class UserLoginLegacy(BaseModel):
+    email_id: str = Field(..., max_length=255, description="User's email address")
+    pin: str = Field(..., min_length=4, max_length=4, description="4-digit PIN (legacy)")
+
+    @validator('email_id')
+    def validate_email_format(cls, v):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, v):
+            raise ValueError('Invalid email format')
+        return v.lower().strip()
+
+    @validator('pin')
+    def validate_pin(cls, v):
         if not v.isdigit():
             raise ValueError('PIN must contain only digits')
         if len(v) != 4:
@@ -137,6 +182,8 @@ class UserResponse(BaseModel):
     country_id: Optional[str] = Field(None, description="Country UUID")
     country: Optional[Country] = Field(None, description="Country information")
     is_admin: bool = Field(False, description="Admin status flag")
+    is_superadmin: bool = Field(False, description="Superadmin status flag")
+    country_admin_country_id: Optional[str] = Field(None, description="Country admin assignment")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -147,6 +194,29 @@ class AuthenticationResponse(BaseModel):
     success: bool = Field(..., description="Authentication success status")
     message: str = Field(..., description="Response message")
     user: Optional[UserResponse] = Field(None, description="User information if successful")
+
+class OTPRequest(BaseModel):
+    email_id: str = Field(..., max_length=255, description="Email address to send OTP")
+    purpose: str = Field(default='login', description="OTP purpose: 'login', 'registration', 'password_reset'")
+
+    @validator('email_id')
+    def validate_email_format(cls, v):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, v):
+            raise ValueError('Invalid email format')
+        return v.lower().strip()
+
+    @validator('purpose')
+    def validate_purpose(cls, v):
+        allowed = ['login', 'registration', 'password_reset']
+        if v not in allowed:
+            raise ValueError(f'Purpose must be one of: {", ".join(allowed)}')
+        return v
+
+class OTPResponse(BaseModel):
+    success: bool = Field(..., description="Request success status")
+    message: str = Field(..., description="Response message")
+    otp_code: Optional[str] = Field(None, description="OTP code (only in development mode)")
 
 class ForgotPinRequest(BaseModel):
     email_id: str = Field(..., max_length=255, description="User's registered email address")
@@ -252,12 +322,13 @@ class Feed(Base):
     fd_code = Column(Text, nullable=False)  # Database stores as text
 
     # Country Information
-    fd_country_id = Column(UUID(as_uuid=True), ForeignKey('country.id'), nullable=True)
+    fd_country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id'), nullable=False)
     fd_country_name = Column(Text, nullable=True)
     fd_country_cd = Column(Text, nullable=True)
 
     # Feed Information
-    fd_name = Column(Text, nullable=False)
+    fd_name = Column(Text, nullable=True)  # Legacy field, kept for backward compatibility
+    fd_name_default = Column(String(255), nullable=False)  # Default name (English, for reference/search)
     fd_category = Column(Text, nullable=True)
     fd_type = Column(Text, nullable=True)
     fd_category_id = Column(UUID(as_uuid=True), ForeignKey('feed_categories.id'), nullable=True)
@@ -286,6 +357,9 @@ class Feed(Base):
     fd_season = Column(Text, nullable=True)
     fd_orginin = Column(Text, nullable=True)
     fd_ipb_local_lab = Column(Text, nullable=True)
+    
+    # Status flag
+    is_active = Column(Boolean, default=True, nullable=False)
 
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -294,6 +368,42 @@ class Feed(Base):
     # Relationships
     country_rel = relationship("CountryModel", back_populates="feeds")
     feed_category_rel = relationship("FeedCategory", foreign_keys=[fd_category_id])
+    translations = relationship("FeedTranslation", back_populates="feed", cascade="all, delete-orphan")
+
+
+class FeedTranslation(Base):
+    """Feed Translation model for multi-language feed names"""
+    __tablename__ = 'feed_translations'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    feed_id = Column(UUID(as_uuid=True), ForeignKey('feeds.id', ondelete='CASCADE'), nullable=False)
+    language_code = Column(String(10), nullable=False)  # ISO 639-1 or 639-2
+    country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id'), nullable=True)  # NULL = global translation
+    fd_name = Column(String(255), nullable=False)
+    fd_description = Column(Text, nullable=True)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    feed = relationship("Feed", back_populates="translations")
+    country = relationship("CountryModel", foreign_keys=[country_id])
+
+
+class CountryLanguage(Base):
+    """Country Language mapping model"""
+    __tablename__ = 'country_languages'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id', ondelete='CASCADE'), nullable=False)
+    language_code = Column(String(10), nullable=False)  # ISO 639-1 or 639-2
+    language_name = Column(String(100), nullable=False)  # 'English', 'Afan Oromo', 'Amharic'
+    is_default = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    country = relationship("CountryModel", back_populates="languages")
 
 
 class CustomFeed(Base):
@@ -303,13 +413,13 @@ class CustomFeed(Base):
     id = Column(UUID(as_uuid=True), default=uuid.uuid4, primary_key=True, nullable=False)
 
     # User Foreign Key
-    user_id = Column(UUID(as_uuid=True), ForeignKey('user_information.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
 
     # Feed Code (format: 'CUST-XXXX' - custom feed sequential number)
     fd_code = Column(String(20), unique=True, nullable=False)
 
     # Country Information
-    fd_country_id = Column(UUID(as_uuid=True), ForeignKey('country.id'), nullable=True)
+    fd_country_id = Column(UUID(as_uuid=True), ForeignKey('countries.id'), nullable=True)
     fd_country_name = Column(String(100), nullable=True)  # Maps to old Fd_Country
     fd_country_cd = Column(String(10), nullable=True)
 
@@ -842,7 +952,7 @@ class DietReport(Base):
     id = Column(UUID(as_uuid=True), default=uuid.uuid4, primary_key=True, nullable=False)
     
     # Foreign Keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey('user_information.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     
     # Report Information
     simulation_id = Column(String(20), nullable=False, index=True)  # e.g., "sim-1234"
@@ -905,7 +1015,7 @@ class Report(Base):
     report_type = Column(String(10), nullable=False, index=True)  # 'rec' or 'eval'
     
     # Foreign Keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey('user_information.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     
     # AWS and Data Storage
     bucket_url = Column(Text, nullable=True)  # URL of PDF in AWS S3 bucket
@@ -964,7 +1074,7 @@ class UserFeedback(Base):
     __tablename__ = 'user_feedback'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('user_information.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     overall_rating = Column(Integer, nullable=True)
     text_feedback = Column(Text)
     feedback_type = Column(String(50), default='General')

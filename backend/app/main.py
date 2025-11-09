@@ -1,9 +1,16 @@
 from fastapi import FastAPI
 from routers.animal import router as animal_router  # Keep diet endpoints
-from routers.auth import auth_router  # Keep authentication
+from routers.auth import auth_router  # Keep authentication (legacy PIN + new OTP)
+from routers.otp_auth import otp_auth_router  # New OTP authentication
+from routers.org_auth import org_auth_router  # Organization registration/login
 from routers.admin import admin_router  # Keep minimal admin (feed management)
+from routers.country_admin import country_admin_router  # Country admin endpoints
 from routers.multi_tenant_admin import router as multi_tenant_router  # Multi-tenant management
+from routers.superadmin import superadmin_router  # Superadmin management
+from routers.feeds import router as feeds_router  # Public feeds endpoints
 from middleware.middleware import LoggingMiddleware
+from middleware.cors_config import setup_cors
+from middleware.error_handler import ErrorHandlerMiddleware
 from middleware.logging_config import get_logger
 
 # Initialize logging
@@ -53,14 +60,29 @@ Mobile app features (PDF generation, report saving) have been removed.
     redoc_url="/redoc"
 )
 
+# Configure CORS (must be before other middleware)
+setup_cors(app)
+
+# Add error handler middleware (catches all exceptions)
+app.add_middleware(ErrorHandlerMiddleware)
+
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
 
+# Add rate limiting middleware (after CORS, before logging)
+from middleware.rate_limiter import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
+
 # Include only essential routers
+app.include_router(feeds_router)  # Public feeds endpoints (MCP server + frontend)
 app.include_router(animal_router)  # Diet endpoints
-app.include_router(auth_router)  # Authentication
+app.include_router(auth_router)  # Authentication (legacy PIN)
+app.include_router(otp_auth_router)  # OTP authentication
+app.include_router(org_auth_router)  # Organization registration/login
 app.include_router(admin_router)  # Minimal admin (feed management only)
+app.include_router(country_admin_router)  # Country admin endpoints
 app.include_router(multi_tenant_router)  # Multi-tenant management
+app.include_router(superadmin_router)  # Superadmin management
 
 @app.get("/")
 async def root():

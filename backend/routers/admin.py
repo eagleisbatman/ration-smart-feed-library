@@ -235,7 +235,7 @@ async def update_feed(
         
         # Check if updated combination already exists (excluding current feed)
         existing_feed = db.query(Feed).filter(
-            Feed.fd_name == feed_data.fd_name,
+            Feed.fd_name_default == feed_data.fd_name,  # Use fd_name_default for new schema
             Feed.fd_type == feed_data.fd_type,
             Feed.fd_category == feed_data.fd_category,
             Feed.fd_country_name == feed_data.fd_country_name,
@@ -263,7 +263,8 @@ async def update_feed(
         
         # Update feed attributes
         feed.fd_code = feed_data.fd_code
-        feed.fd_name = feed_data.fd_name
+        feed.fd_name = feed_data.fd_name  # Legacy field
+        feed.fd_name_default = feed_data.fd_name  # Map to new schema field
         feed.fd_category = feed_data.fd_category
         feed.fd_type = feed_data.fd_type
         feed.fd_country_id = country.id
@@ -300,7 +301,7 @@ async def update_feed(
         feed_response = FeedDetailsResponse(
             feed_id=str(feed.id),
             fd_code=feed.fd_code,
-            fd_name=feed.fd_name,
+            fd_name=feed.fd_name_default if hasattr(feed, 'fd_name_default') and feed.fd_name_default else feed.fd_name,  # Use fd_name_default if available
             fd_type=feed.fd_type,
             fd_category=feed.fd_category,
             fd_country_id=str(feed.fd_country_id) if feed.fd_country_id else None,
@@ -477,7 +478,7 @@ async def list_feeds(
         if search:
             search_term = f"%{search}%"
             query = query.filter(
-                (Feed.fd_name.ilike(search_term)) |
+                (Feed.fd_name_default.ilike(search_term)) |  # Use fd_name_default for new schema
                 (Feed.fd_code.ilike(search_term))
             )
         
@@ -497,7 +498,7 @@ async def list_feeds(
             feed_responses.append(FeedDetailsResponse(
                 feed_id=str(feed.id),
                 fd_code=feed.fd_code,
-                fd_name=feed.fd_name,
+                fd_name=feed.fd_name_default if hasattr(feed, 'fd_name_default') and feed.fd_name_default else feed.fd_name,  # Use fd_name_default if available
                 fd_type=feed.fd_type,
                 fd_category=feed.fd_category,
                 fd_country_id=str(feed.fd_country_id) if feed.fd_country_id else None,
@@ -585,16 +586,37 @@ async def bulk_upload_feeds(
             )
         
         # Validate file type
-        if not file.filename.endswith(('.xlsx', '.xls')):
+        if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File must be an Excel file (.xlsx or .xls)"
             )
         
+        # Validate file size (max 50MB)
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE / (1024*1024):.0f}MB"
+            )
+        
+        # Validate content type
+        if file.content_type not in [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/octet-stream'  # Some browsers send this for .xls
+        ]:
+            # Allow if filename suggests Excel file (content-type can be unreliable)
+            if not file.filename.endswith(('.xlsx', '.xls')):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file type. Only Excel files (.xlsx, .xls) are allowed"
+                )
+        
         # Read Excel file
         try:
-            # Read file content as bytes and create a BytesIO object for pandas
-            file_content = await file.read()
+            # Create a BytesIO object for pandas
             df = pd.read_excel(io.BytesIO(file_content))
         except Exception as e:
             raise HTTPException(
@@ -638,9 +660,9 @@ async def bulk_upload_feeds(
                     failed_uploads += 1
                     continue
                 
-                # Check if feed already exists (case-insensitive fd_name, case-sensitive others)
+                # Check if feed already exists (case-insensitive fd_name_default, case-sensitive others)
                 existing_feed = db.query(Feed).filter(
-                    func.lower(Feed.fd_name) == func.lower(str(row['fd_name'])),
+                    func.lower(Feed.fd_name_default) == func.lower(str(row['fd_name'])),
                     Feed.fd_type == str(row['fd_type']),
                     Feed.fd_category == str(row['fd_category']),
                     Feed.fd_country_name == str(row['fd_country_name'])
@@ -707,7 +729,8 @@ async def bulk_upload_feeds(
                 if existing_feed:
                     # UPDATE existing feed with new data
                     existing_feed.fd_code = str(row.get('fd_code', '')) if not pd.isna(row.get('fd_code', '')) else None
-                    existing_feed.fd_name = str(row['fd_name'])
+                    existing_feed.fd_name = str(row['fd_name'])  # Legacy field
+                    existing_feed.fd_name_default = str(row['fd_name'])  # Map to new schema field
                     existing_feed.fd_category = str(row['fd_category'])
                     existing_feed.fd_type = str(row['fd_type'])
                     existing_feed.fd_category_id = feed_category.id
@@ -741,7 +764,8 @@ async def bulk_upload_feeds(
                     # CREATE new feed
                     new_feed = Feed(
                         fd_code=str(row.get('fd_code', '')) if not pd.isna(row.get('fd_code', '')) else None,
-                        fd_name=str(row['fd_name']),
+                        fd_name=str(row['fd_name']),  # Legacy field
+                        fd_name_default=str(row['fd_name']),  # Map to new schema field
                         fd_category=str(row['fd_category']),
                         fd_type=str(row['fd_type']),
                         fd_category_id=feed_category.id,
@@ -1797,7 +1821,7 @@ async def add_feed(
         
         # Check if feed already exists (unique constraint)
         existing_feed = db.query(Feed).filter(
-            Feed.fd_name == feed_data.fd_name,
+            Feed.fd_name_default == feed_data.fd_name,  # Use fd_name_default for new schema
             Feed.fd_type == feed_data.fd_type,
             Feed.fd_category == feed_data.fd_category,
             Feed.fd_country_name == feed_data.fd_country_name
@@ -1825,7 +1849,8 @@ async def add_feed(
         # Create new feed
         new_feed = Feed(
             fd_code=feed_data.fd_code,
-            fd_name=feed_data.fd_name,
+            fd_name=feed_data.fd_name,  # Legacy field
+            fd_name_default=feed_data.fd_name,  # Map to new schema field
             fd_category=feed_data.fd_category,
             fd_type=feed_data.fd_type,
             fd_country_id=country.id,

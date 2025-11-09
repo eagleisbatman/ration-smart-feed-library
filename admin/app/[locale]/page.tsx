@@ -1,3 +1,9 @@
+'use client';
+
+import { secureStorage } from '@/lib/secure-storage';
+
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +20,39 @@ import {
 
 export default function DashboardPage() {
   const t = useTranslations('common');
+  const router = useRouter();
+
+  const [isChecking, setIsChecking] = React.useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in, redirect based on role
+    const user = secureStorage.getUser();
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    setIsChecking(false);
+    // Only redirect if user has specific role
+    if (user.is_superadmin) {
+      router.push('/superadmin');
+    } else if (user.country_admin_country_id) {
+      router.push('/country-admin');
+    }
+    // Otherwise show dashboard
+  }, [router]);
+
+  if (isChecking) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const stats = [
     {

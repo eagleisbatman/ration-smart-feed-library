@@ -1,18 +1,12 @@
 'use client';
 
-import { useTranslations } from '@/hooks/use-translations';
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -22,52 +16,129 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Link } from '@/lib/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { organizationsApi, apiKeysApi } from '@/lib/api';
-import { useState } from 'react';
-import { Plus, Key, Building2, Copy, Trash2, Eye, EyeOff } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { organizationsApi, apiKeysApi, auth } from '@/lib/api';
 import { toast } from 'sonner';
+import { Plus, Key, Building2, Copy, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
-export default function APIKeysPage() {
-  const t = useTranslations('apiKeys');
-  const tCommon = useTranslations('common');
+function APIKeysContent() {
+  const queryClient = useQueryClient();
+  const user = auth.getCurrentUser();
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
+  const [keyName, setKeyName] = useState('');
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   // Fetch organizations
   const { data: organizations = [] } = useQuery({
-    queryKey: ['organizations'],
-    queryFn: () => organizationsApi.getAll('admin-user-id').then(res => res.data),
+    queryKey: ['organizations', user?.id],
+    queryFn: () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return organizationsApi.getAll(user.id).then(res => res.data);
+    },
+    enabled: !!user?.id,
   });
 
   // Fetch API keys for selected organization
-  const { data: apiKeys = [], refetch } = useQuery({
-    queryKey: ['api-keys', selectedOrg],
-    queryFn: () => apiKeysApi.getAll(selectedOrg, 'admin-user-id').then(res => res.data),
-    enabled: !!selectedOrg,
+  const { data: apiKeys = [], isLoading: isLoadingKeys } = useQuery({
+    queryKey: ['api-keys', selectedOrg, user?.id],
+    queryFn: () => {
+      if (!selectedOrg || !user?.id) throw new Error('Organization or user not selected');
+      return apiKeysApi.getAll(selectedOrg, user.id).then(res => res.data);
+    },
+    enabled: !!selectedOrg && !!user?.id,
   });
 
-  const handleGenerateKey = async (orgId: string, name: string) => {
-    try {
-      const response = await apiKeysApi.create(orgId, { name }, 'admin-user-id');
-      setNewKey(response.data.api_key);
+  // Generate API key mutation
+  const generateKeyMutation = useMutation({
+    mutationFn: async ({ orgId, name }: { orgId: string; name: string }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return apiKeysApi.create(orgId, { name }, user.id);
+    },
+    onSuccess: (data) => {
+      setNewKey(data.data.api_key);
       setIsGenerateDialogOpen(true);
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] });
       toast.success('API Key Generated', {
         description: 'Copy the key now - it will not be shown again!',
       });
-    } catch (error) {
-      toast.error('Failed to generate API key');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to generate API key');
+    },
+  });
+
+  // Revoke API key mutation
+  const revokeKeyMutation = useMutation({
+    mutationFn: async (keyId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return apiKeysApi.revoke(keyId, user.id);
+    },
+    onSuccess: () => {
+      toast.success('API key revoked successfully');
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+      setRevokingKeyId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to revoke API key');
+    },
+  });
+
+  const handleGenerateKey = () => {
+    if (!selectedOrg) {
+      toast.error('Please select an organization');
+      return;
     }
+    if (!keyName.trim()) {
+      toast.error('Please enter a name for the API key');
+      return;
+    }
+    generateKeyMutation.mutate({ orgId: selectedOrg, name: keyName });
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('API key copied to clipboard');
+  };
+
+  const toggleKeyVisibility = (keyId: string) => {
+    setVisibleKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(keyId)) {
+        next.delete(keyId);
+      } else {
+        next.add(keyId);
+      }
+      return next;
+    });
   };
 
   return (
@@ -76,16 +147,19 @@ export default function APIKeysPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <Key className="h-8 w-8" />
+              API Key Management
+            </h1>
             <p className="text-muted-foreground">
-              Manage API keys for organizations using the Feed Formulation API
+              Generate and manage API keys for organizations
             </p>
           </div>
           <Button asChild>
-            <Link href="/organizations">
+            <a href="/organizations">
               <Building2 className="mr-2 h-4 w-4" />
               Manage Organizations
-            </Link>
+            </a>
           </Button>
         </div>
 
@@ -99,18 +173,104 @@ export default function APIKeysPage() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
-              <select
-                value={selectedOrg}
-                onChange={(e) => setSelectedOrg(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Select an organization...</option>
-                {organizations.map((org: any) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name} ({org.slug})
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select an organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org: any) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name} ({org.slug})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedOrg && (
+                <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Generate API Key
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Generate New API Key</DialogTitle>
+                      <DialogDescription>
+                        Create a new API key for {organizations.find((o: any) => o.id === selectedOrg)?.name}
+                      </DialogDescription>
+                    </DialogHeader>
+                    {newKey ? (
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 bg-muted rounded-lg">
+                          <Label className="text-sm text-muted-foreground">API Key (Copy this now - it won't be shown again)</Label>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Input
+                              value={newKey}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => copyToClipboard(newKey)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-4 border border-yellow-500 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            ⚠️ Important: Save this API key securely. You won't be able to see it again.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="key-name">Key Name</Label>
+                          <Input
+                            id="key-name"
+                            value={keyName}
+                            onChange={(e) => setKeyName(e.target.value)}
+                            placeholder="Production API Key"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            A friendly name to identify this API key
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsGenerateDialogOpen(false);
+                          setNewKey(null);
+                          setKeyName('');
+                        }}
+                      >
+                        {newKey ? 'Close' : 'Cancel'}
+                      </Button>
+                      {!newKey && (
+                        <Button
+                          onClick={handleGenerateKey}
+                          disabled={generateKeyMutation.isPending || !keyName.trim()}
+                        >
+                          {generateKeyMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            'Generate'
+                          )}
+                        </Button>
+                      )}
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -119,40 +279,20 @@ export default function APIKeysPage() {
         {selectedOrg && (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>API Keys</CardTitle>
-                  <CardDescription>
-                    {apiKeys.length} API key{apiKeys.length !== 1 ? 's' : ''} for this organization
-                  </CardDescription>
-                </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t('generateKey')}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t('generateKey')}</DialogTitle>
-                      <DialogDescription>
-                        Generate a new API key for this organization
-                      </DialogDescription>
-                    </DialogHeader>
-                    <GenerateKeyForm
-                      organizationId={selectedOrg}
-                      onGenerate={handleGenerateKey}
-                      onClose={() => setIsGenerateDialogOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <CardTitle>API Keys</CardTitle>
+              <CardDescription>
+                Manage API keys for {organizations.find((o: any) => o.id === selectedOrg)?.name}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {apiKeys.length === 0 ? (
+              {isLoadingKeys ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading API keys...</p>
+                </div>
+              ) : apiKeys.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No API keys found. Generate your first API key to get started.
+                  No API keys found. Generate one to get started.
                 </div>
               ) : (
                 <Table>
@@ -169,36 +309,51 @@ export default function APIKeysPage() {
                   <TableBody>
                     {apiKeys.map((key: any) => (
                       <TableRow key={key.id}>
-                        <TableCell className="font-medium">{key.name || 'Unnamed Key'}</TableCell>
+                        <TableCell className="font-medium">{key.name || 'Unnamed'}</TableCell>
                         <TableCell className="font-mono text-sm">
-                          {key.key_prefix}...
+                          {visibleKeys.has(key.id) ? (
+                            <span className="text-muted-foreground">Full key hidden</span>
+                          ) : (
+                            `${key.key_prefix}...`
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={key.is_active ? 'default' : 'secondary'}>
-                            {key.is_active ? t('active') : t('inactive')}
+                            {key.is_active ? 'Active' : 'Revoked'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {key.last_used_at
+                          {key.last_used_at 
                             ? new Date(key.last_used_at).toLocaleDateString()
-                            : 'Never'}
+                            : 'Never'
+                          }
                         </TableCell>
                         <TableCell>
                           {key.expires_at
                             ? new Date(key.expires_at).toLocaleDateString()
-                            : 'Never'}
+                            : 'Never'
+                          }
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => copyToClipboard(key.key_prefix)}
+                              onClick={() => toggleKeyVisibility(key.id)}
                             >
-                              <Copy className="h-4 w-4" />
+                              {visibleKeys.has(key.id) ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
                             </Button>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setRevokingKeyId(key.id)}
+                              disabled={!key.is_active}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>
@@ -211,100 +366,47 @@ export default function APIKeysPage() {
           </Card>
         )}
 
-        {/* New Key Dialog */}
-        {newKey && (
-          <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>API Key Generated</DialogTitle>
-                <DialogDescription>
-                  {t('keyWarning')}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Your API Key</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newKey}
-                      readOnly
-                      className="font-mono"
-                    />
-                    <Button
-                      onClick={() => copyToClipboard(newKey)}
-                      variant="outline"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    ⚠️ This key will not be shown again. Store it securely.
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={() => {
-                  setNewKey(null);
-                  setIsGenerateDialogOpen(false);
-                }}>
-                  I've Saved It
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* Revoke Confirmation Dialog */}
+        <AlertDialog open={!!revokingKeyId} onOpenChange={(open) => !open && setRevokingKeyId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke API Key?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The API key will be immediately deactivated and all requests using it will fail.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={revokeKeyMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (revokingKeyId) {
+                    revokeKeyMutation.mutate(revokingKeyId);
+                  }
+                }}
+                disabled={revokeKeyMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {revokeKeyMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Revoking...
+                  </>
+                ) : (
+                  'Revoke'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
 }
 
-function GenerateKeyForm({
-  organizationId,
-  onGenerate,
-  onClose,
-}: {
-  organizationId: string;
-  onGenerate: (orgId: string, name: string) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [expiresInDays, setExpiresInDays] = useState<string>('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onGenerate(organizationId, name || 'API Key');
-  };
-
+export default function APIKeysPage() {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Key Name (Optional)</Label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., Production API Key"
-        />
-      </div>
-      <div>
-        <Label htmlFor="expires">Expires In (Days, Optional)</Label>
-        <Input
-          id="expires"
-          type="number"
-          value={expiresInDays}
-          onChange={(e) => setExpiresInDays(e.target.value)}
-          placeholder="Leave empty for no expiration"
-        />
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit">Generate Key</Button>
-      </DialogFooter>
-    </form>
+    <ProtectedRoute allowedRoles={['admin', 'superadmin', 'organization_admin']}>
+      <APIKeysContent />
+    </ProtectedRoute>
   );
 }
-

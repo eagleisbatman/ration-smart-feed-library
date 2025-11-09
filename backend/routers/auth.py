@@ -23,7 +23,8 @@ from app.models import (
     ForgotPinResponse,
     ChangePinRequest,
     ChangePinResponse,
-    UserDeleteAccountResponse
+    UserDeleteAccountResponse,
+    CountryLanguage
 )
 from app.models import UserUpdateRequest
 from services.auth_utils import (
@@ -202,7 +203,7 @@ async def login_user(
             detail=f"Login failed: {str(e)}"
         )
 
-@auth_router.get("/countries", response_model=List[Country])
+@auth_router.get("/countries")
 async def get_countries(db: Session = Depends(get_db)):
     """
     Get all active countries for registration dropdown
@@ -217,18 +218,39 @@ async def get_countries(db: Session = Depends(get_db)):
     try:
         countries = get_all_countries(db)
         
-        return [
-            Country(
-                id=str(country.id),
-                name=country.name,
-                country_code=country.country_code,
-                currency=country.currency,
-                is_active=country.is_active,
-                created_at=country.created_at,
-                updated_at=country.updated_at
-            )
-            for country in countries
-        ]
+        # Get country languages for each country
+        result = []
+        for country in countries:
+            # Fetch country languages
+            country_languages = db.query(CountryLanguage).filter(
+                CountryLanguage.country_id == country.id,
+                CountryLanguage.is_active == True
+            ).all()
+            
+            # Build country response with languages
+            country_dict = {
+                "id": str(country.id),
+                "name": country.name,
+                "country_code": country.country_code,
+                "currency": country.currency,
+                "is_active": country.is_active,
+                "created_at": country.created_at,
+                "updated_at": country.updated_at,
+                "supported_languages": country.supported_languages if hasattr(country, 'supported_languages') else ["en"],
+                "country_languages": [
+                    {
+                        "id": str(lang.id),
+                        "language_code": lang.language_code,
+                        "language_name": lang.language_name,
+                        "is_default": lang.is_default,
+                        "is_active": lang.is_active
+                    }
+                    for lang in country_languages
+                ]
+            }
+            result.append(country_dict)
+        
+        return result
         
     except Exception as e:
         raise HTTPException(

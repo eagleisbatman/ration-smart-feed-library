@@ -117,11 +117,14 @@ POSTGRES_PASSWORD = urllib.parse.quote_plus(os.getenv("POSTGRES_PASSWORD", ""))
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-print("POSTGRES_PORT",POSTGRES_PORT)
 
-# SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+# SECURITY: Never log database credentials
+# Only log connection status, not credentials
+if not all([POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_HOST, POSTGRES_PORT]):
+    raise ValueError("Missing required database environment variables")
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-print("SQLALCHEMY_DATABASE_URL",SQLALCHEMY_DATABASE_URL)
+# SECURITY: Do not log database URL as it contains credentials
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

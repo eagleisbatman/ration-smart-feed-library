@@ -53,7 +53,10 @@ async function runMigration() {
     console.log('✅ Connected successfully!\n');
 
     // Read migration file
-    const migrationPath = join(__dirname, '../migrations/001_create_new_database_schema.sql');
+    const migrationFile = process.argv[2] || 'migrations/001_create_new_database_schema.sql';
+    const migrationPath = migrationFile.startsWith('/') 
+      ? migrationFile 
+      : join(__dirname, '..', migrationFile);
     console.log(`📖 Reading migration file: ${migrationPath}`);
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
 

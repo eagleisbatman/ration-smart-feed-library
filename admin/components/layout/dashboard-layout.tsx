@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
@@ -27,13 +28,25 @@ import {
   Languages,
   LogOut,
   User,
+  Shield,
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { locales } from '@/lib/i18n';
 
-const navigation = [
+const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Feeds', href: '/feeds', icon: Database },
+];
+
+const superadminNavigation = [
+  { name: 'Superadmin', href: '/superadmin', icon: Shield },
+];
+
+const countryAdminNavigation = [
+  { name: 'Country Admin', href: '/country-admin', icon: Globe },
+];
+
+const adminNavigation = [
   { name: 'Countries', href: '/countries', icon: Globe },
   { name: 'Organizations', href: '/organizations', icon: Building2 },
   { name: 'API Keys', href: '/api-keys', icon: Key },
@@ -45,6 +58,35 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const locale = useLocale();
   const { theme, setTheme } = useTheme();
+
+  // Get user role from secure storage
+  const [userRole, setUserRole] = React.useState<'superadmin' | 'country_admin' | 'admin' | null>(null);
+  
+  React.useEffect(() => {
+    const user = secureStorage.getUser();
+    if (user) {
+      if (user.is_superadmin) {
+        setUserRole('superadmin');
+      } else if (user.country_admin_country_id) {
+        setUserRole('country_admin');
+      } else {
+        setUserRole('admin');
+      }
+    }
+  }, []);
+
+  // Build navigation based on role
+  const navigation = React.useMemo(() => {
+    let nav = [...baseNavigation];
+    if (userRole === 'superadmin') {
+      nav = [...nav, ...superadminNavigation, ...adminNavigation];
+    } else if (userRole === 'country_admin') {
+      nav = [...nav, ...countryAdminNavigation];
+    } else if (userRole === 'admin') {
+      nav = [...nav, ...adminNavigation];
+    }
+    return nav;
+  }, [userRole]);
 
   return (
     <div className="flex h-screen w-full">
@@ -123,9 +165,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Admin User</p>
+                    <p className="text-sm font-medium leading-none">
+                      {userRole === 'superadmin' ? 'Superadmin' : userRole === 'country_admin' ? 'Country Admin' : 'Admin User'}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      admin@example.com
+                      {typeof window !== 'undefined' ? (secureStorage.getUserEmail() || 'admin@example.com') : 'admin@example.com'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -143,7 +187,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    secureStorage.clearAll();
+                    window.location.href = '/login';
+                  }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>{t('logout')}</span>
                 </DropdownMenuItem>
